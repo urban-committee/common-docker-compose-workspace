@@ -1,113 +1,67 @@
-#version: "3"
-##volumes:
-##  prometheus_data: {}
 
 services:
   blogsite-service-registry:
     image: blogsite-service-registry
+    build:
+          context: C:\Urban-committee\blogsite-service-registory
+          dockerfile: Dockerfile
     ports:
-      - "8761:8761"
+      - "8081:8081"
     networks:
       - data-emission-network
-
-#  techefx-product-stock-service:
-#    image: techefx-product-stock-service
-#    environment:
-#      - JAVA_OPTS=
-#        -DEUREKA_SERVER=http://techefx-eureka-namng-service:8761/eureka
-#        -DZIPKIN_SERVER=http://zipkin:9411/
-#    ports:
-#      - "8800:8800"
-#    #    links:
-#    #      - zipkin
-#    depends_on:
-#      - techefx-eureka-namng-service
-#    #      - zipkin
-#    networks:
-#      - test-network
-
-
-#  techefx-product-enquiry-service:
-#    image: techefx-product-enquiry-service
-#    environment:
-#      - JAVA_OPTS=
-#        -DEUREKA_SERVER=http://techefx-eureka-namng-service:8761/eureka
-#        -DZIPKIN_SERVER=http://zipkin:9411/
-#    ports:
-#      - "8700:8700"
-#    #   links:
-#    #     - zipkin
-#    depends_on:
-#      - techefx-product-stock-service
-#    #     - zipkin
-#    networks:
-#      - test-network
-
 
   blogsite-api-gateway:
     image: blogsite-api-gateway
+    restart: on-failure
+    build:
+          context: C:\Urban-committee\blogsite-api-gateway
+          dockerfile: Dockerfile
     environment:
-      - JAVA_OPTS=
-        -DEUREKA_SERVER=http://EUREKA_DISCOVERY_SERVICE:8081/eureka
-        -DZIPKIN_SERVER=http://zipkin:9411/
-        - EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://eureka-server:8081/eureka/
-    #       -DENQUIRY_SERVICE=http://techefx-product-enquiry-service:9700/
+      - EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://blogsite-service-registry:8081/eureka/
+      - JAVA_OPTS=-DEUREKA_SERVER=http://blogsite-service-registry:8081/eureka -DZIPKIN_SERVER=http://zipkin:9411/
     ports:
       - "8080:8080"
-    #   links:
-    #     - zipkin
-
     depends_on:
       - blogsite-service-registry
-#      - techefx-eureka-namng-service
-#      - techefx-product-enquiry-service
-#      - techefx-product-stock-service
-    #      - zipkin
     networks:
       - data-emission-network
 
-
-#  prometheus:
-#    image: prom/prometheus
-#    volumes:
-#      - ./config/:/etc/prometheus
-#      - ./data/prometheus:/data
-#    command:
-#      - '--config.file=/etc/prometheus/prometheus.yml'
-#      - '--storage.tsdb.path=/prometheus'
-#      - '--storage.tsdb.retention=31d'
-#      - '--web.console.libraries=/usr/share/prometheus/console_libraries'
-#      - '--web.console.templates=/usr/share/prometheus/consoles'
-#    ports:
-#      - "9090:9090"
-#    depends_on:
-#      - techefx-product-stock-service
-#    networks:
-#      - test-network
-
-
-#  grafana:
-#    image: grafana/grafana
-#    ports:
-#      - "3000:3000"
-#    depends_on:
-#      - prometheus
-#    networks:
-#      - test-network
-
-
-  zipkin:
-    image: openzipkin/zipkin
+  mysql:
+    image: mysql:8.0.32
+    container_name: mysql
     environment:
-      - STORAGE_TYPE=mem
+      MYSQL_ROOT_PASSWORD: root
+      MYSQL_DATABASE: blogsite
     ports:
-      - "9411:9411"
-    depends_on:
-      - blogsite-service-registry
+      - "3307:3306"
+    volumes:
+      - db_data:/var/lib/mysql
     networks:
       - data-emission-network
 
+  blogsite-user-service:
+    image: blogsite-user-service:latest
+    restart: on-failure
+    build:
+      context: C:\Urban-committee\user-service
+      dockerfile: Dockerfile
+    environment:
+      - EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://blogsite-service-registry:8081/eureka/
+      - JAVA_OPTS=-DEUREKA_SERVER=http://blogsite-service-registry:8081/eureka -DZIPKIN_SERVER=http://zipkin:9411/
+      - SPRING_DATASOURCE_USERNAME=root
+      - SPRING_DATASOURCE_PASSWORD=root
+      - SPRING_DATASOURCE_URL=jdbc:mysql://mysql:3306/blogsite
+    ports:
+      - "8082:8082"
+    depends_on:
+      - blogsite-service-registry
+      - blogsite-api-gateway
+      - mysql
+    networks:
+      - data-emission-network
 
+volumes:
+  db_data:
 
 networks:
   data-emission-network:
