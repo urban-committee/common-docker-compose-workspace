@@ -1,5 +1,18 @@
 
 services:
+  mysql:
+    image: mysql:8.0.32
+    container_name: mysql
+    environment:
+      MYSQL_ROOT_PASSWORD: root
+      MYSQL_DATABASE: blogsite
+    ports:
+      - "3307:3306"
+    volumes:
+      - db_data:/var/lib/mysql
+    networks:
+      - data-emission-network
+
   blogsite-service-registry:
     image: blogsite-service-registry
     build:
@@ -26,19 +39,6 @@ services:
     networks:
       - data-emission-network
 
-  mysql:
-    image: mysql:8.0.32
-    container_name: mysql
-    environment:
-      MYSQL_ROOT_PASSWORD: root
-      MYSQL_DATABASE: blogsite
-    ports:
-      - "3307:3306"
-    volumes:
-      - db_data:/var/lib/mysql
-    networks:
-      - data-emission-network
-
   blogsite-user-service:
     image: blogsite-user-service:latest
     restart: on-failure
@@ -56,6 +56,28 @@ services:
     depends_on:
       - blogsite-service-registry
       - blogsite-api-gateway
+      - mysql
+    networks:
+      - data-emission-network
+
+  blogsite-blog-service:
+    image: blogsite-blog-service:latest
+    restart: on-failure
+    build:
+      context: C:\Urban-committee\blog-service
+      dockerfile: Dockerfile
+    environment:
+      - EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://blogsite-service-registry:8081/eureka/
+      - JAVA_OPTS=-DEUREKA_SERVER=http://blogsite-service-registry:8081/eureka -DZIPKIN_SERVER=http://zipkin:9411/
+      - SPRING_DATASOURCE_USERNAME=root
+      - SPRING_DATASOURCE_PASSWORD=root
+      - SPRING_DATASOURCE_URL=jdbc:mysql://mysql:3306/blogsite
+    ports:
+      - "8083:8083"
+    depends_on:
+      - blogsite-service-registry
+      - blogsite-api-gateway
+      - blogsite-user-service
       - mysql
     networks:
       - data-emission-network
